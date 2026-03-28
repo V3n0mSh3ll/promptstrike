@@ -1,0 +1,72 @@
+name: PromptStrike Security Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: 'AI provider to scan'
+        required: true
+        default: 'openai'
+        type: choice
+        options:
+          - openai
+          - gemini
+          - anthropic
+          - groq
+          - mistral
+          - custom
+      model:
+        description: 'Model name'
+        required: true
+        default: 'gpt-5.4'
+      categories:
+        description: 'Attack categories (comma-separated or all)'
+        required: false
+        default: 'all'
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run PromptStrike scan
+        run: |
+          python promptstrike.py \
+            --provider ${{ inputs.provider }} \
+            --model "${{ inputs.model }}" \
+            --key "${{ secrets.AI_API_KEY }}" \
+            --scan full \
+            --mode balanced \
+            --output-dir results
+
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-results
+          path: results/
+
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run test suite
+        run: python tests/test_core.py
